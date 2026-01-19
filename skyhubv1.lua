@@ -1,568 +1,1053 @@
--- SkyHub Ultimate - Fixed Game Saver
+-- SkyHub Dex++ - Advanced Game Explorer
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Kiểm tra writefile có tồn tại không
-local function canSaveFiles()
-    return type(writefile) == "function" and type(readfile) == "function" and type(listfiles) == "function"
-end
-
--- ============== TẠO GIAO DIỆN ĐƠN GIẢN ==============
+-- ============== TẠO GIAO DIỆN DEX++ STYLE ==============
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SkyHubSaver"
+screenGui.Name = "DexPlusPlus"
 screenGui.Parent = playerGui
 screenGui.ResetOnSpawn = false
 
--- Menu Icon
-local menuIcon = Instance.new("TextButton")
-menuIcon.Name = "MenuIcon"
-menuIcon.Size = UDim2.new(0, 50, 0, 50)
-menuIcon.Position = UDim2.new(0, 20, 0.5, -25)
-menuIcon.Text = "💾"
-menuIcon.Font = Enum.Font.GothamBlack
-menuIcon.TextSize = 24
-menuIcon.TextColor3 = Color3.fromRGB(0, 255, 255)
-menuIcon.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-menuIcon.AutoButtonColor = true
-menuIcon.Visible = true
-menuIcon.Parent = screenGui
-
-local iconCorner = Instance.new("UICorner")
-iconCorner.CornerRadius = UDim.new(0, 10)
-iconCorner.Parent = menuIcon
-
--- Main Menu
+-- Main Container (Dex Style)
 local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainMenu"
-mainFrame.Size = UDim2.new(0, 300, 0, 400)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.Name = "MainContainer"
+mainFrame.Size = UDim2.new(0, 800, 0, 500)
+mainFrame.Position = UDim2.new(0.5, -400, 0.5, -250)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 mainFrame.BorderSizePixel = 0
-mainFrame.Visible = false
+mainFrame.Visible = true
 mainFrame.Parent = screenGui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.CornerRadius = UDim.new(0, 8)
 mainCorner.Parent = mainFrame
 
--- Title
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 50)
-title.Position = UDim2.new(0, 10, 0, 10)
-title.BackgroundTransparency = 1
-title.Text = "💾 Game Saver v2.0"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(0, 255, 255)
-title.Parent = mainFrame
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -100, 1, 0)
+titleText.Position = UDim2.new(0, 10, 0, 0)
+titleText.Text = "🎮 DEX++ Game Explorer"
+titleText.Font = Enum.Font.GothamBold
+titleText.TextSize = 14
+titleText.TextColor3 = Color3.fromRGB(0, 255, 255)
+titleText.BackgroundTransparency = 1
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
 
 -- Close Button
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 10)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 16
-closeBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+closeBtn.Size = UDim2.new(0, 80, 1, 0)
+closeBtn.Position = UDim2.new(1, -85, 0, 0)
+closeBtn.Text = "Close"
+closeBtn.Font = Enum.Font.Gotham
+closeBtn.TextSize = 12
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
 closeBtn.AutoButtonColor = true
-closeBtn.Parent = mainFrame
+closeBtn.Parent = titleBar
 
--- ============== HÀM SAVE CƠ BẢN VÀ HOẠT ĐỘNG ==============
+-- ============== TAB SYSTEM ==============
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, -20, 0, 30)
+tabContainer.Position = UDim2.new(0, 10, 0, 40)
+tabContainer.BackgroundTransparency = 1
+tabContainer.Parent = mainFrame
 
--- Hàm tạo nút đơn giản
-local function createButton(parent, text, yPos)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -20, 0, 40)
-    button.Position = UDim2.new(0, 10, 0, yPos)
-    button.Text = text
-    button.Font = Enum.Font.Gotham
-    button.TextSize = 14
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    button.AutoButtonColor = true
-    button.Parent = parent
+local tabs = {
+    {name = "📁 Explorer", color = Color3.fromRGB(0, 150, 200)},
+    {name = "📜 Scripts", color = Color3.fromRGB(0, 180, 120)},
+    {name = "🏗️ Models", color = Color3.fromRGB(200, 100, 0)},
+    {name = "💾 Save", color = Color3.fromRGB(180, 0, 180)}
+}
+
+local tabButtons = {}
+local tabPages = {}
+
+-- Tạo tab buttons
+for i, tabInfo in ipairs(tabs) do
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Size = UDim2.new(0, 100, 1, 0)
+    tabBtn.Position = UDim2.new(0, (i-1)*105, 0, 0)
+    tabBtn.Text = tabInfo.name
+    tabBtn.Font = Enum.Font.Gotham
+    tabBtn.TextSize = 12
+    tabBtn.TextColor3 = Color3.new(1, 1, 1)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    tabBtn.AutoButtonColor = true
+    tabBtn.Parent = tabContainer
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = button
+    local tabPage = Instance.new("Frame")
+    tabPage.Size = UDim2.new(1, -20, 1, -80)
+    tabPage.Position = UDim2.new(0, 10, 0, 80)
+    tabPage.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    tabPage.Visible = i == 1
+    tabPage.Parent = mainFrame
     
-    return button
+    table.insert(tabButtons, tabBtn)
+    table.insert(tabPages, tabPage)
+    
+    tabBtn.MouseButton1Click:Connect(function()
+        for j, page in ipairs(tabPages) do
+            page.Visible = j == i
+            tabButtons[j].BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+        end
+        tabBtn.BackgroundColor3 = tabInfo.color
+    end)
+    
+    if i == 1 then
+        tabBtn.BackgroundColor3 = tabInfo.color
+    end
 end
 
--- Tạo scroll frame cho các nút
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 1, -70)
-scrollFrame.Position = UDim2.new(0, 10, 0, 70)
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.ScrollBarThickness = 5
-scrollFrame.Parent = mainFrame
+-- ============== EXPLORER TAB (Dex Style) ==============
+local explorerPage = tabPages[1]
 
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 10)
-layout.Parent = scrollFrame
+-- Tree View Container
+local treeContainer = Instance.new("ScrollingFrame")
+treeContainer.Size = UDim2.new(0.3, -10, 1, -10)
+treeContainer.Position = UDim2.new(0, 10, 0, 10)
+treeContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+treeContainer.ScrollBarThickness = 5
+treeContainer.Parent = explorerPage
 
--- ============== CÁC HÀM SAVE THỰC TẾ ==============
+-- Properties Panel
+local propsContainer = Instance.new("Frame")
+propsContainer.Size = UDim2.new(0.7, -20, 1, -10)
+propsContainer.Position = UDim2.new(0.3, 10, 0, 10)
+propsContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+propsContainer.Parent = explorerPage
 
--- 1. Save Scripts từ một service
-local function saveScriptsFromService(service, serviceName)
-    if not canSaveFiles() then
-        warn("Không thể save files trên executor này!")
-        return 0
+-- ============== GAME EXPLORER ENGINE ==============
+local Explorer = {
+    SelectedObject = nil,
+    ObjectCache = {},
+    TreeNodes = {}
+}
+
+-- Hàm tạo tree node
+function Explorer:CreateTreeNode(parent, obj, depth)
+    if not obj then return end
+    
+    local nodeFrame = Instance.new("Frame")
+    nodeFrame.Size = UDim2.new(1, -depth*20, 0, 25)
+    nodeFrame.Position = UDim2.new(0, depth*20, 0, #self.TreeNodes * 25)
+    nodeFrame.BackgroundTransparency = 1
+    nodeFrame.Parent = parent
+    
+    local expandBtn = Instance.new("TextButton")
+    expandBtn.Size = UDim2.new(0, 20, 0, 20)
+    expandBtn.Position = UDim2.new(0, 0, 0, 2)
+    expandBtn.Text = "+"
+    expandBtn.Font = Enum.Font.GothamBold
+    expandBtn.TextSize = 12
+    expandBtn.TextColor3 = Color3.new(1, 1, 1)
+    expandBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    expandBtn.AutoButtonColor = true
+    expandBtn.Parent = nodeFrame
+    
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.Size = UDim2.new(0, 20, 0, 20)
+    iconLabel.Position = UDim2.new(0, 25, 0, 2)
+    iconLabel.Text = self:GetIconForClass(obj.ClassName)
+    iconLabel.Font = Enum.Font.Gotham
+    iconLabel.TextSize = 12
+    iconLabel.TextColor3 = Color3.new(1, 1, 1)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Parent = nodeFrame
+    
+    local nameLabel = Instance.new("TextButton")
+    nameLabel.Size = UDim2.new(1, -50, 0, 20)
+    nameLabel.Position = UDim2.new(0, 50, 0, 2)
+    nameLabel.Text = obj.Name
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 12
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.AutoButtonColor = false
+    nameLabel.Parent = nodeFrame
+    
+    -- Click để chọn object
+    nameLabel.MouseButton1Click:Connect(function()
+        self:SelectObject(obj)
+    end)
+    
+    table.insert(self.TreeNodes, nodeFrame)
+    return nodeFrame
+end
+
+-- Hàm lấy icon cho class
+function Explorer:GetIconForClass(className)
+    local icons = {
+        Workspace = "🏢",
+        Model = "🏗️",
+        Part = "🧱",
+        Script = "📜",
+        LocalScript = "📱",
+        ModuleScript = "📦",
+        Folder = "📁",
+        Sound = "🎵",
+        Light = "💡",
+        Camera = "📷",
+        Humanoid = "👤",
+        MeshPart = "🔷",
+        UnionOperation = "🔶",
+        Motor6D = "🔗",
+        Motor = "⚙️"
+    }
+    return icons[className] or "📄"
+end
+
+-- Hàm chọn object
+function Explorer:SelectObject(obj)
+    self.SelectedObject = obj
+    self:UpdatePropertiesPanel()
+end
+
+-- Hàm cập nhật properties panel
+function Explorer:UpdatePropertiesPanel()
+    local propsPanel = propsContainer
+    propsPanel:ClearAllChildren()
+    
+    if not self.SelectedObject then
+        local noSelect = Instance.new("TextLabel")
+        noSelect.Size = UDim2.new(1, -20, 1, -20)
+        noSelect.Position = UDim2.new(0, 10, 0, 10)
+        noSelect.Text = "Select an object to view properties"
+        noSelect.Font = Enum.Font.Gotham
+        noSelect.TextSize = 14
+        noSelect.TextColor3 = Color3.fromRGB(200, 200, 200)
+        noSelect.BackgroundTransparency = 1
+        noSelect.Parent = propsPanel
+        return
     end
     
-    local scriptCount = 0
-    local allScripts = {}
+    local obj = self.SelectedObject
     
-    -- Thu thập tất cả scripts
-    for _, obj in ipairs(service:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+    -- Object header
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 40)
+    header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    header.Parent = propsPanel
+    
+    local icon = Instance.new("TextLabel")
+    icon.Size = UDim2.new(0, 30, 0, 30)
+    icon.Position = UDim2.new(0, 10, 0, 5)
+    icon.Text = self:GetIconForClass(obj.ClassName)
+    icon.Font = Enum.Font.GothamBold
+    icon.TextSize = 16
+    icon.TextColor3 = Color3.new(1, 1, 1)
+    icon.BackgroundTransparency = 1
+    icon.Parent = header
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.5, -50, 0, 30)
+    nameLabel.Position = UDim2.new(0, 50, 0, 5)
+    nameLabel.Text = obj.Name
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 14
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Parent = header
+    
+    local classLabel = Instance.new("TextLabel")
+    classLabel.Size = UDim2.new(0.5, -10, 0, 30)
+    classLabel.Position = UDim2.new(0.5, 10, 0, 5)
+    classLabel.Text = "Class: "..obj.ClassName
+    classLabel.Font = Enum.Font.Gotham
+    classLabel.TextSize = 12
+    classLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    classLabel.TextXAlignment = Enum.TextXAlignment.Right
+    classLabel.BackgroundTransparency = 1
+    classLabel.Parent = header
+    
+    -- Properties scroll
+    local propsScroll = Instance.new("ScrollingFrame")
+    propsScroll.Size = UDim2.new(1, -20, 1, -60)
+    propsScroll.Position = UDim2.new(0, 10, 0, 50)
+    propsScroll.BackgroundTransparency = 1
+    propsScroll.ScrollBarThickness = 5
+    propsScroll.Parent = propsPanel
+    
+    local yPos = 0
+    
+    -- Hiển thị properties
+    local function addProperty(name, value, color)
+        local propFrame = Instance.new("Frame")
+        propFrame.Size = UDim2.new(1, -10, 0, 25)
+        propFrame.Position = UDim2.new(0, 5, 0, yPos)
+        propFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        propFrame.Parent = propsScroll
+        
+        local propName = Instance.new("TextLabel")
+        propName.Size = UDim2.new(0.4, -5, 1, 0)
+        propName.Position = UDim2.new(0, 5, 0, 0)
+        propName.Text = name
+        propName.Font = Enum.Font.Gotham
+        propName.TextSize = 12
+        propName.TextColor3 = color or Color3.fromRGB(0, 200, 255)
+        propName.TextXAlignment = Enum.TextXAlignment.Left
+        propName.BackgroundTransparency = 1
+        propName.Parent = propFrame
+        
+        local propValue = Instance.new("TextLabel")
+        propValue.Size = UDim2.new(0.6, -10, 1, 0)
+        propValue.Position = UDim2.new(0.4, 5, 0, 0)
+        propValue.Text = tostring(value)
+        propValue.Font = Enum.Font.Gotham
+        propValue.TextSize = 11
+        propValue.TextColor3 = Color3.fromRGB(200, 200, 200)
+        propValue.TextXAlignment = Enum.TextXAlignment.Left
+        propValue.BackgroundTransparency = 1
+        propValue.Parent = propFrame
+        
+        yPos = yPos + 30
+    end
+    
+    -- Basic properties
+    addProperty("Name", obj.Name)
+    addProperty("ClassName", obj.ClassName)
+    
+    -- Object specific properties
+    if obj:IsA("BasePart") then
+        addProperty("Position", string.format("(%.2f, %.2f, %.2f)", 
+            obj.Position.X, obj.Position.Y, obj.Position.Z))
+        addProperty("Size", string.format("(%.2f, %.2f, %.2f)", 
+            obj.Size.X, obj.Size.Y, obj.Size.Z))
+        addProperty("Color", string.format("RGB(%.0f, %.0f, %.0f)", 
+            obj.Color.R*255, obj.Color.G*255, obj.Color.B*255))
+        addProperty("Material", tostring(obj.Material))
+        addProperty("Transparency", obj.Transparency)
+        addProperty("CanCollide", tostring(obj.CanCollide))
+        addProperty("Anchored", tostring(obj.Anchored))
+    elseif obj:IsA("Model") then
+        addProperty("PrimaryPart", obj.PrimaryPart and obj.PrimaryPart.Name or "None")
+        addProperty("Children", #obj:GetChildren())
+    elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+        addProperty("Enabled", tostring(obj.Enabled))
+        addProperty("Disabled", tostring(obj.Disabled))
+        
+        -- View source button
+        local viewBtn = Instance.new("TextButton")
+        viewBtn.Size = UDim2.new(1, -20, 0, 25)
+        viewBtn.Position = UDim2.new(0, 10, 0, yPos)
+        viewBtn.Text = "📜 View Source"
+        viewBtn.Font = Enum.Font.Gotham
+        viewBtn.TextSize = 12
+        viewBtn.TextColor3 = Color3.new(1, 1, 1)
+        viewBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+        viewBtn.AutoButtonColor = true
+        viewBtn.Parent = propsScroll
+        
+        viewBtn.MouseButton1Click:Connect(function()
             local success, source = pcall(function()
                 return obj.Source
             end)
             
-            if success and source and #source > 0 then
-                scriptCount = scriptCount + 1
-                table.insert(allScripts, {
-                    name = obj.Name,
-                    class = obj.ClassName,
-                    path = obj:GetFullName(),
-                    source = source
-                })
+            if success and source then
+                -- Tạo script viewer
+                local viewer = Instance.new("ScreenGui")
+                viewer.Name = "ScriptViewer"
+                viewer.Parent = playerGui
+                
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(0, 700, 0, 500)
+                frame.Position = UDim2.new(0.5, -350, 0.5, -250)
+                frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+                frame.Parent = viewer
+                
+                local title = Instance.new("TextLabel")
+                title.Size = UDim2.new(1, -20, 0, 40)
+                title.Position = UDim2.new(0, 10, 0, 10)
+                title.Text = obj.Name .. " (" .. obj.ClassName .. ")"
+                title.Font = Enum.Font.GothamBold
+                title.TextSize = 16
+                title.TextColor3 = Color3.fromRGB(0, 255, 255)
+                title.BackgroundTransparency = 1
+                title.Parent = frame
+                
+                local closeBtn2 = Instance.new("TextButton")
+                closeBtn2.Size = UDim2.new(0, 30, 0, 30)
+                closeBtn2.Position = UDim2.new(1, -35, 0, 10)
+                closeBtn2.Text = "X"
+                closeBtn2.Font = Enum.Font.GothamBold
+                closeBtn2.TextSize = 16
+                closeBtn2.TextColor3 = Color3.fromRGB(255, 50, 50)
+                closeBtn2.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+                closeBtn2.AutoButtonColor = true
+                closeBtn2.Parent = frame
+                closeBtn2.MouseButton1Click:Connect(function()
+                    viewer:Destroy()
+                end)
+                
+                local textBox = Instance.new("TextBox")
+                textBox.Size = UDim2.new(1, -20, 1, -60)
+                textBox.Position = UDim2.new(0, 10, 0, 50)
+                textBox.Text = source
+                textBox.Font = Enum.Font.Code
+                textBox.TextSize = 12
+                textBox.TextColor3 = Color3.new(1, 1, 1)
+                textBox.BackgroundTransparency = 1
+                textBox.TextXAlignment = Enum.TextXAlignment.Left
+                textBox.TextYAlignment = Enum.TextYAlignment.Top
+                textBox.TextWrapped = false
+                textBox.MultiLine = true
+                textBox.TextEditable = false
+                textBox.Parent = frame
+                
+                local lineCount = #string.split(source, "\n")
+                local infoLabel = Instance.new("TextLabel")
+                infoLabel.Size = UDim2.new(1, -20, 0, 20)
+                infoLabel.Position = UDim2.new(0, 10, 1, -30)
+                infoLabel.Text = "Lines: " .. lineCount .. " | Path: " .. obj:GetFullName()
+                infoLabel.Font = Enum.Font.Gotham
+                infoLabel.TextSize = 11
+                infoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                infoLabel.BackgroundTransparency = 1
+                infoLabel.Parent = frame
             end
-        end
+        end)
+        
+        yPos = yPos + 30
     end
     
-    if scriptCount > 0 then
-        -- Tạo folder
-        local folderName = "Scripts_"..serviceName.."_"..os.time()
-        
-        -- Lưu từng script
-        for i, scriptData in ipairs(allScripts) do
-            local safeName = string.gsub(scriptData.name, "[^%w_]", "_")
-            local filename = folderName.."/"..safeName..".lua"
-            
-            local content = "-- Script: "..scriptData.name.."\n"
-            content = content .. "-- Type: "..scriptData.class.."\n"
-            content = content .. "-- Path: "..scriptData.path.."\n"
-            content = content .. "-- Saved: "..os.date().."\n\n"
-            content = content .. scriptData.source
-            
-            writefile(filename, content)
-        end
-        
-        -- Tạo index file
-        local indexContent = "Total scripts: "..scriptCount.."\n\n"
-        for i, scriptData in ipairs(allScripts) do
-            indexContent = indexContent .. i..". "..scriptData.name.." ("..scriptData.class..")\n"
-            indexContent = indexContent .. "   Lines: "..#string.split(scriptData.source, "\n").."\n"
-        end
-        
-        writefile(folderName.."/_INDEX.txt", indexContent)
-    end
-    
-    return scriptCount
+    propsScroll.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
 end
 
--- 2. Save Model data
-local function saveModelData()
-    if not canSaveFiles() then return 0 end
+-- Khởi tạo explorer với Workspace
+spawn(function()
+    wait(1)
+    
+    -- Tạo root nodes cho các services quan trọng
+    local services = {
+        Workspace,
+        ReplicatedStorage,
+        ServerScriptService,
+        ServerStorage,
+        game:GetService("Lighting"),
+        game:GetService("StarterPack"),
+        game:GetService("StarterGui")
+    }
+    
+    for _, service in ipairs(services) do
+        local node = Explorer:CreateTreeNode(treeContainer, service, 0)
+        
+        -- Add children
+        for _, child in ipairs(service:GetChildren()) do
+            Explorer:CreateTreeNode(treeContainer, child, 1)
+        end
+    end
+    
+    treeContainer.CanvasSize = UDim2.new(0, 0, 0, #Explorer.TreeNodes * 30)
+end)
+
+-- ============== SCRIPTS TAB ==============
+local scriptsPage = tabPages[2]
+
+local scriptsContainer = Instance.new("ScrollingFrame")
+scriptsContainer.Size = UDim2.new(1, -20, 1, -10)
+scriptsContainer.Position = UDim2.new(0, 10, 0, 10)
+scriptsContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+scriptsContainer.ScrollBarThickness = 5
+scriptsContainer.Parent = scriptsPage
+
+local function loadScriptsTab()
+    scriptsContainer:ClearAllChildren()
+    
+    local servicesToCheck = {
+        {name = "Workspace", service = Workspace},
+        {name = "ReplicatedStorage", service = ReplicatedStorage},
+        {name = "ServerScriptService", service = ServerScriptService},
+        {name = "ServerStorage", service = ServerStorage}
+    }
+    
+    local yPos = 0
+    
+    for _, serviceInfo in ipairs(servicesToCheck) do
+        -- Service header
+        local header = Instance.new("Frame")
+        header.Size = UDim2.new(1, -10, 0, 30)
+        header.Position = UDim2.new(0, 5, 0, yPos)
+        header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        header.Parent = scriptsContainer
+        
+        local headerText = Instance.new("TextLabel")
+        headerText.Size = UDim2.new(1, -10, 1, 0)
+        headerText.Position = UDim2.new(0, 10, 0, 0)
+        headerText.Text = "📁 " .. serviceInfo.name
+        headerText.Font = Enum.Font.GothamBold
+        headerText.TextSize = 14
+        headerText.TextColor3 = Color3.fromRGB(0, 255, 255)
+        headerText.TextXAlignment = Enum.TextXAlignment.Left
+        headerText.BackgroundTransparency = 1
+        headerText.Parent = header
+        
+        yPos = yPos + 35
+        
+        -- Scripts in service
+        local scriptCount = 0
+        for _, obj in ipairs(serviceInfo.service:GetDescendants()) do
+            if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+                scriptCount = scriptCount + 1
+                
+                local scriptFrame = Instance.new("Frame")
+                scriptFrame.Size = UDim2.new(1, -20, 0, 40)
+                scriptFrame.Position = UDim2.new(0, 10, 0, yPos)
+                scriptFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+                scriptFrame.Parent = scriptsContainer
+                
+                local icon = Instance.new("TextLabel")
+                icon.Size = UDim2.new(0, 30, 0, 30)
+                icon.Position = UDim2.new(0, 10, 0, 5)
+                icon.Text = Explorer:GetIconForClass(obj.ClassName)
+                icon.Font = Enum.Font.GothamBold
+                icon.TextSize = 14
+                icon.TextColor3 = Color3.new(1, 1, 1)
+                icon.BackgroundTransparency = 1
+                icon.Parent = scriptFrame
+                
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(0.4, -50, 0, 30)
+                nameLabel.Position = UDim2.new(0, 50, 0, 5)
+                nameLabel.Text = obj.Name
+                nameLabel.Font = Enum.Font.Gotham
+                nameLabel.TextSize = 12
+                nameLabel.TextColor3 = Color3.new(1, 1, 1)
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Parent = scriptFrame
+                
+                local pathLabel = Instance.new("TextLabel")
+                pathLabel.Size = UDim2.new(0.4, -10, 0, 30)
+                pathLabel.Position = UDim2.new(0.4, 10, 0, 5)
+                pathLabel.Text = obj:GetFullName()
+                pathLabel.Font = Enum.Font.Gotham
+                pathLabel.TextSize = 10
+                pathLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+                pathLabel.TextXAlignment = Enum.TextXAlignment.Left
+                pathLabel.BackgroundTransparency = 1
+                pathLabel.Parent = scriptFrame
+                
+                local viewBtn = Instance.new("TextButton")
+                viewBtn.Size = UDim2.new(0, 80, 0, 25)
+                viewBtn.Position = UDim2.new(1, -90, 0, 7)
+                viewBtn.Text = "👁️ View"
+                viewBtn.Font = Enum.Font.Gotham
+                viewBtn.TextSize = 11
+                viewBtn.TextColor3 = Color3.new(1, 1, 1)
+                viewBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+                viewBtn.AutoButtonColor = true
+                viewBtn.Parent = scriptFrame
+                
+                viewBtn.MouseButton1Click:Connect(function()
+                    local success, source = pcall(function()
+                        return obj.Source
+                    end)
+                    
+                    if success and source then
+                        -- Tạo script viewer
+                        local viewer = Instance.new("ScreenGui")
+                        viewer.Name = "ScriptViewer"
+                        viewer.Parent = playerGui
+                        
+                        local frame = Instance.new("Frame")
+                        frame.Size = UDim2.new(0, 700, 0, 500)
+                        frame.Position = UDim2.new(0.5, -350, 0.5, -250)
+                        frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+                        frame.Parent = viewer
+                        
+                        local title = Instance.new("TextLabel")
+                        title.Size = UDim2.new(1, -20, 0, 40)
+                        title.Position = UDim2.new(0, 10, 0, 10)
+                        title.Text = obj.Name .. " (" .. obj.ClassName .. ")"
+                        title.Font = Enum.Font.GothamBold
+                        title.TextSize = 16
+                        title.TextColor3 = Color3.fromRGB(0, 255, 255)
+                        title.BackgroundTransparency = 1
+                        title.Parent = frame
+                        
+                        local closeBtn2 = Instance.new("TextButton")
+                        closeBtn2.Size = UDim2.new(0, 30, 0, 30)
+                        closeBtn2.Position = UDim2.new(1, -35, 0, 10)
+                        closeBtn2.Text = "X"
+                        closeBtn2.Font = Enum.Font.GothamBold
+                        closeBtn2.TextSize = 16
+                        closeBtn2.TextColor3 = Color3.fromRGB(255, 50, 50)
+                        closeBtn2.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+                        closeBtn2.AutoButtonColor = true
+                        closeBtn2.Parent = frame
+                        closeBtn2.MouseButton1Click:Connect(function()
+                            viewer:Destroy()
+                        end)
+                        
+                        local textBox = Instance.new("TextBox")
+                        textBox.Size = UDim2.new(1, -20, 1, -60)
+                        textBox.Position = UDim2.new(0, 10, 0, 50)
+                        textBox.Text = source
+                        textBox.Font = Enum.Font.Code
+                        textBox.TextSize = 12
+                        textBox.TextColor3 = Color3.new(1, 1, 1)
+                        textBox.BackgroundTransparency = 1
+                        textBox.TextXAlignment = Enum.TextXAlignment.Left
+                        textBox.TextYAlignment = Enum.TextYAlignment.Top
+                        textBox.TextWrapped = false
+                        textBox.MultiLine = true
+                        textBox.TextEditable = false
+                        textBox.Parent = frame
+                    end
+                end)
+                
+                yPos = yPos + 45
+            end
+        end
+        
+        if scriptCount == 0 then
+            local noScripts = Instance.new("TextLabel")
+            noScripts.Size = UDim2.new(1, -20, 0, 25)
+            noScripts.Position = UDim2.new(0, 10, 0, yPos)
+            noScripts.Text = "No scripts found"
+            noScripts.Font = Enum.Font.Gotham
+            noScripts.TextSize = 12
+            noScripts.TextColor3 = Color3.fromRGB(150, 150, 150)
+            noScripts.BackgroundTransparency = 1
+            noScripts.Parent = scriptsContainer
+            yPos = yPos + 30
+        end
+    end
+    
+    scriptsContainer.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
+end
+
+-- ============== MODELS TAB ==============
+local modelsPage = tabPages[3]
+
+local modelsContainer = Instance.new("ScrollingFrame")
+modelsContainer.Size = UDim2.new(1, -20, 1, -10)
+modelsContainer.Position = UDim2.new(0, 10, 0, 10)
+modelsContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+modelsContainer.ScrollBarThickness = 5
+modelsContainer.Parent = modelsPage
+
+local function loadModelsTab()
+    modelsContainer:ClearAllChildren()
     
     local models = {}
     
+    -- Tìm tất cả models trong Workspace
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") then
+        if obj:IsA("Model") and #obj:GetChildren() > 0 then
             local partCount = 0
-            local children = {}
-            
-            for _, child in ipairs(obj:GetChildren()) do
+            for _, child in ipairs(obj:GetDescendants()) do
                 if child:IsA("BasePart") then
                     partCount = partCount + 1
-                    table.insert(children, {
-                        name = child.Name,
-                        class = child.ClassName,
-                        position = {child.Position.X, child.Position.Y, child.Position.Z},
-                        size = {child.Size.X, child.Size.Y, child.Size.Z}
-                    })
                 end
             end
             
             if partCount > 0 then
                 table.insert(models, {
+                    model = obj,
                     name = obj.Name,
-                    partCount = partCount,
-                    children = children
+                    partCount = partCount
                 })
             end
         end
     end
     
-    if #models > 0 then
-        local filename = "Models_"..os.time()..".json"
-        writefile(filename, HttpService:JSONEncode({
-            totalModels = #models,
-            models = models,
-            timestamp = os.time(),
-            placeId = game.PlaceId
-        }))
-    end
+    local yPos = 0
     
-    return #models
-end
-
--- 3. Save Map Info
-local function saveMapInfo()
-    if not canSaveFiles() then return 0 end
+    -- Models header
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, -10, 0, 30)
+    header.Position = UDim2.new(0, 5, 0, yPos)
+    header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    header.Parent = modelsContainer
     
-    local parts = {}
-    local partCount = 0
+    local headerText = Instance.new("TextLabel")
+    headerText.Size = UDim2.new(1, -10, 1, 0)
+    headerText.Position = UDim2.new(0, 10, 0, 0)
+    headerText.Text = "🏗️ Models in Workspace (" .. #models .. " found)"
+    headerText.Font = Enum.Font.GothamBold
+    headerText.TextSize = 14
+    headerText.TextColor3 = Color3.fromRGB(0, 255, 255)
+    headerText.TextXAlignment = Enum.TextXAlignment.Left
+    headerText.BackgroundTransparency = 1
+    headerText.Parent = header
     
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            partCount = partCount + 1
-            table.insert(parts, {
-                name = obj.Name,
-                position = {obj.Position.X, obj.Position.Y, obj.Position.Z},
-                size = {obj.Size.X, obj.Size.Y, obj.Size.Z},
-                color = {obj.Color.R, obj.Color.G, obj.Color.B}
-            })
-        end
-    end
+    yPos = yPos + 35
     
-    local filename = "MapInfo_"..game.PlaceId..".json"
-    writefile(filename, HttpService:JSONEncode({
-        gameName = game.Name,
-        placeId = game.PlaceId,
-        totalParts = partCount,
-        parts = parts,
-        playerCount = #Players:GetPlayers()
-    }))
-    
-    return partCount
-end
-
--- 4. View Scripts trong UI
-local function viewScriptsInUI()
-    local scripts = {}
-    
-    -- Thu thập scripts từ Workspace
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
-            local success, source = pcall(function()
-                return obj.Source
-            end)
-            
-            if success and source and #source > 0 then
-                table.insert(scripts, {
-                    name = obj.Name,
-                    type = obj.ClassName,
-                    path = obj:GetFullName(),
-                    source = source
-                })
-            end
-        end
-    end
-    
-    -- Thu thập từ ReplicatedStorage
-    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
-            local success, source = pcall(function()
-                return obj.Source
-            end)
-            
-            if success and source and #source > 0 then
-                table.insert(scripts, {
-                    name = obj.Name,
-                    type = obj.ClassName,
-                    path = obj:GetFullName(),
-                    source = source
-                })
-            end
-        end
-    end
-    
-    if #scripts == 0 then
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "❌ No Scripts",
-            Text = "No scripts found to view",
-            Duration = 3
-        })
-        return
-    end
-    
-    -- Tạo GUI xem scripts
-    local viewerGui = Instance.new("ScreenGui")
-    viewerGui.Name = "ScriptViewer"
-    viewerGui.Parent = playerGui
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 600, 0, 400)
-    frame.Position = UDim2.new(0.5, -300, 0.5, -200)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    frame.Parent = viewerGui
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -20, 0, 40)
-    title.Position = UDim2.new(0, 10, 0, 10)
-    title.Text = "📜 Scripts Found: "..#scripts
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.TextColor3 = Color3.fromRGB(0, 255, 255)
-    title.BackgroundTransparency = 1
-    title.Parent = frame
-    
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 10)
-    closeBtn.Text = "X"
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
-    closeBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    closeBtn.AutoButtonColor = true
-    closeBtn.Parent = frame
-    closeBtn.MouseButton1Click:Connect(function()
-        viewerGui:Destroy()
-    end)
-    
-    -- Script list
-    local listFrame = Instance.new("Frame")
-    listFrame.Size = UDim2.new(0, 200, 1, -60)
-    listFrame.Position = UDim2.new(0, 10, 0, 50)
-    listFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    listFrame.Parent = frame
-    
-    local scrollList = Instance.new("ScrollingFrame")
-    scrollList.Size = UDim2.new(1, -10, 1, -10)
-    scrollList.Position = UDim2.new(0, 5, 0, 5)
-    scrollList.BackgroundTransparency = 1
-    scrollList.ScrollBarThickness = 5
-    scrollList.Parent = listFrame
-    
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Padding = UDim.new(0, 5)
-    listLayout.Parent = scrollList
-    
-    -- Script content
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, -230, 1, -60)
-    contentFrame.Position = UDim2.new(0, 220, 0, 50)
-    contentFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    contentFrame.Parent = frame
-    
-    local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -20, 1, -20)
-    textBox.Position = UDim2.new(0, 10, 0, 10)
-    textBox.Text = "Select a script to view..."
-    textBox.Font = Enum.Font.Code
-    textBox.TextSize = 12
-    textBox.TextColor3 = Color3.new(1, 1, 1)
-    textBox.BackgroundTransparency = 1
-    textBox.TextXAlignment = Enum.TextXAlignment.Left
-    textBox.TextYAlignment = Enum.TextYAlignment.Top
-    textBox.TextWrapped = false
-    textBox.MultiLine = true
-    textBox.TextEditable = false
-    textBox.Parent = contentFrame
-    
-    -- Thêm scripts vào list
-    for i, scriptData in ipairs(scripts) do
-        local scriptBtn = Instance.new("TextButton")
-        scriptBtn.Size = UDim2.new(1, -10, 0, 30)
-        scriptBtn.Text = scriptData.name
-        scriptBtn.Font = Enum.Font.Gotham
-        scriptBtn.TextSize = 11
-        scriptBtn.TextColor3 = Color3.new(1, 1, 1)
-        scriptBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-        scriptBtn.AutoButtonColor = true
-        scriptBtn.Parent = scrollList
+    -- Hiển thị models
+    for i, modelData in ipairs(models) do
+        local modelFrame = Instance.new("Frame")
+        modelFrame.Size = UDim2.new(1, -20, 0, 60)
+        modelFrame.Position = UDim2.new(0, 10, 0, yPos)
+        modelFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        modelFrame.Parent = modelsContainer
         
-        scriptBtn.MouseButton1Click:Connect(function()
-            textBox.Text = "-- "..scriptData.name.." ("..scriptData.type..")\n"
-            textBox.Text = textBox.Text .. "-- Path: "..scriptData.path.."\n"
-            textBox.Text = textBox.Text .. "-- Lines: "..#string.split(scriptData.source, "\n").."\n\n"
-            textBox.Text = textBox.Text .. scriptData.source
+        local icon = Instance.new("TextLabel")
+        icon.Size = UDim2.new(0, 40, 0, 40)
+        icon.Position = UDim2.new(0, 10, 0, 10)
+        icon.Text = "🏗️"
+        icon.Font = Enum.Font.GothamBold
+        icon.TextSize = 20
+        icon.TextColor3 = Color3.new(1, 1, 1)
+        icon.BackgroundTransparency = 1
+        icon.Parent = modelFrame
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(0.5, -60, 0, 20)
+        nameLabel.Position = UDim2.new(0, 60, 0, 10)
+        nameLabel.Text = modelData.name
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextSize = 14
+        nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Parent = modelFrame
+        
+        local infoLabel = Instance.new("TextLabel")
+        infoLabel.Size = UDim2.new(0.5, -60, 0, 20)
+        infoLabel.Position = UDim2.new(0, 60, 0, 30)
+        infoLabel.Text = "Parts: " .. modelData.partCount
+        infoLabel.Font = Enum.Font.Gotham
+        infoLabel.TextSize = 12
+        infoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+        infoLabel.BackgroundTransparency = 1
+        infoLabel.Parent = modelFrame
+        
+        -- Buttons
+        local viewBtn = Instance.new("TextButton")
+        viewBtn.Size = UDim2.new(0, 70, 0, 25)
+        viewBtn.Position = UDim2.new(1, -150, 0, 7)
+        viewBtn.Text = "👁️ View"
+        viewBtn.Font = Enum.Font.Gotham
+        viewBtn.TextSize = 11
+        viewBtn.TextColor3 = Color3.new(1, 1, 1)
+        viewBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+        viewBtn.AutoButtonColor = true
+        viewBtn.Parent = modelFrame
+        
+        viewBtn.MouseButton1Click:Connect(function()
+            -- Highlight model
+            for _, part in ipairs(modelData.model:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = 0.3
+                    part.Color = Color3.fromRGB(0, 255, 255)
+                end
+            end
         end)
+        
+        local cloneBtn = Instance.new("TextButton")
+        cloneBtn.Size = UDim2.new(0, 70, 0, 25)
+        cloneBtn.Position = UDim2.new(1, -75, 0, 7)
+        cloneBtn.Text = "📋 Clone"
+        cloneBtn.Font = Enum.Font.Gotham
+        cloneBtn.TextSize = 11
+        cloneBtn.TextColor3 = Color3.new(1, 1, 1)
+        cloneBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        cloneBtn.AutoButtonColor = true
+        cloneBtn.Parent = modelFrame
+        
+        cloneBtn.MouseButton1Click:Connect(function()
+            local clone = modelData.model:Clone()
+            clone.Parent = Workspace
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                clone:MoveTo(player.Character.HumanoidRootPart.Position + Vector3.new(10, 0, 0))
+            end
+        end)
+        
+        yPos = yPos + 65
     end
     
-    scrollList.CanvasSize = UDim2.new(0, 0, 0, #scripts * 35)
+    if #models == 0 then
+        local noModels = Instance.new("TextLabel")
+        noModels.Size = UDim2.new(1, -20, 0, 50)
+        noModels.Position = UDim2.new(0, 10, 0, yPos)
+        noModels.Text = "No models found in Workspace"
+        noModels.Font = Enum.Font.Gotham
+        noModels.TextSize = 14
+        noModels.TextColor3 = Color3.fromRGB(150, 150, 150)
+        noModels.BackgroundTransparency = 1
+        noModels.Parent = modelsContainer
+        yPos = yPos + 60
+    end
+    
+    modelsContainer.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
 end
 
--- 5. Save Game Data đơn giản
-local function saveSimpleGameData()
-    if not canSaveFiles() then return false end
+-- ============== SAVE TAB ==============
+local savePage = tabPages[4]
+
+local saveContainer = Instance.new("ScrollingFrame")
+saveContainer.Size = UDim2.new(1, -20, 1, -10)
+saveContainer.Position = UDim2.new(0, 10, 0, 10)
+saveContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+saveContainer.ScrollBarThickness = 5
+saveContainer.Parent = savePage
+
+local function createSaveButton(text, yPos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 40)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.Text = text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    btn.AutoButtonColor = true
+    btn.Parent = saveContainer
     
-    local gameData = {
-        gameName = game.Name,
-        placeId = game.PlaceId,
-        players = {},
-        time = os.time(),
-        date = os.date()
+    btn.MouseButton1Click:Connect(callback)
+    
+    return btn
+end
+
+-- Hàm tạo RBXM file (Model file)
+local function saveAsRBXM(model, filename)
+    -- Đơn giản hóa: Lưu thông tin model
+    local modelData = {
+        Type = "Model",
+        Name = model.Name,
+        Children = {}
     }
     
-    -- Player data
-    for _, plr in ipairs(Players:GetPlayers()) do
-        table.insert(gameData.players, {
-            name = plr.Name,
-            userId = plr.UserId,
-            displayName = plr.DisplayName
-        })
-    end
-    
-    -- Map info
-    local partCount = 0
-    for _ in ipairs(Workspace:GetDescendants()) do
-        partCount = partCount + 1
-    end
-    gameData.partCount = partCount
-    
-    -- Lưu file
-    local filename = "GameData_"..game.PlaceId.."_"..os.time()..".json"
-    local success, err = pcall(function()
-        writefile(filename, HttpService:JSONEncode(gameData))
-    end)
-    
-    return success
-end
-
--- ============== TẠO CÁC NÚT CHỨC NĂNG ==============
-
--- Check file saving capability
-if canSaveFiles() then
-    -- Nút Save Scripts từ Workspace
-    local saveWorkspaceScriptsBtn = createButton(scrollFrame, "📜 Save Workspace Scripts", 0)
-    saveWorkspaceScriptsBtn.MouseButton1Click:Connect(function()
-        local count = saveScriptsFromService(Workspace, "Workspace")
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "✅ Saved",
-            Text = "Saved "..count.." scripts from Workspace",
-            Duration = 4
-        })
-    end)
-    
-    -- Nút Save ReplicatedStorage Scripts
-    local saveReplicatedScriptsBtn = createButton(scrollFrame, "📦 Save ReplicatedStorage Scripts", 50)
-    saveReplicatedScriptsBtn.MouseButton1Click:Connect(function()
-        local count = saveScriptsFromService(game:GetService("ReplicatedStorage"), "ReplicatedStorage")
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "✅ Saved",
-            Text = "Saved "..count.." scripts from ReplicatedStorage",
-            Duration = 4
-        })
-    end)
-    
-    -- Nút Save Models
-    local saveModelsBtn = createButton(scrollFrame, "🏗️ Save Models Data", 100)
-    saveModelsBtn.MouseButton1Click:Connect(function()
-        local count = saveModelData()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "✅ Saved",
-            Text = "Saved "..count.." models data",
-            Duration = 4
-        })
-    end)
-    
-    -- Nút Save Map Info
-    local saveMapBtn = createButton(scrollFrame, "🗺️ Save Map Info", 150)
-    saveMapBtn.MouseButton1Click:Connect(function()
-        local count = saveMapInfo()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "✅ Saved",
-            Text = "Saved map with "..count.." parts",
-            Duration = 4
-        })
-    end)
-    
-    -- Nút Save Game Data
-    local saveGameBtn = createButton(scrollFrame, "💾 Save Game Data", 200)
-    saveGameBtn.MouseButton1Click:Connect(function()
-        local success = saveSimpleGameData()
-        if success then
-            game.StarterGui:SetCore("SendNotification", {
-                Title = "✅ Game Saved",
-                Text = "Game data saved successfully",
-                Duration = 4
-            })
-        else
-            game.StarterGui:SetCore("SendNotification", {
-                Title = "❌ Error",
-                Text = "Failed to save game data",
-                Duration = 4
+    for _, child in ipairs(model:GetChildren()) do
+        if child:IsA("BasePart") then
+            table.insert(modelData.Children, {
+                Type = "Part",
+                Name = child.Name,
+                Position = {child.Position.X, child.Position.Y, child.Position.Z},
+                Size = {child.Size.X, child.Size.Y, child.Size.Z},
+                Color = {child.Color.R, child.Color.G, child.Color.B}
             })
         end
-    end)
-else
-    -- Thông báo không thể save files
-    local noSaveBtn = createButton(scrollFrame, "⚠️ Cannot Save Files", 0)
-    noSaveBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-    noSaveBtn.MouseButton1Click:Connect(function()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "❌ Warning",
-            Text = "Your executor doesn't support file saving",
-            Duration = 5
-        })
-    end)
+    end
+    
+    local jsonData = HttpService:JSONEncode(modelData)
+    
+    -- Kiểm tra writefile
+    if type(writefile) == "function" then
+        writefile(filename .. ".json", jsonData)
+        
+        -- Tạo file .rbxm đơn giản
+        local rbxmContent = string.format([[
+<roblox version="4">
+    <External>null</External>
+    <External>nil</External>
+    <Item class="Model" referent="RBX0">
+        <Properties>
+            <string name="Name">%s</string>
+        </Properties>
+]], model.Name)
+        
+        for i, child in ipairs(modelData.Children) do
+            rbxmContent = rbxmContent .. string.format([[
+        <Item class="Part" referent="RBX%d">
+            <Properties>
+                <string name="Name">%s</string>
+                <CoordinateFrame name="CFrame">
+                    <X>%f</X>
+                    <Y>%f</Y>
+                    <Z>%f</Z>
+                    <R00>1</R00><R01>0</R01><R02>0</R02>
+                    <R10>0</R10><R11>1</R11><R12>0</R12>
+                    <R20>0</R20><R21>0</R21><R22>1</R22>
+                </CoordinateFrame>
+                <Vector3 name="Size">
+                    <X>%f</X>
+                    <Y>%f</Y>
+                    <Z>%f</Z>
+                </Vector3>
+            </Properties>
+        </Item>
+]], i, child.Name, 
+   child.Position[1], child.Position[2], child.Position[3],
+   child.Size[1], child.Size[2], child.Size[3])
+        end
+        
+        rbxmContent = rbxmContent .. "    </Item>\n</roblox>"
+        
+        writefile(filename .. ".rbxm", rbxmContent)
+        return true
+    end
+    
+    return false
 end
 
--- Nút View Scripts (luôn hoạt động)
-local viewScriptsBtn = createButton(scrollFrame, "👁️ View Scripts", 250)
-viewScriptsBtn.MouseButton1Click:Connect(function()
-    viewScriptsInUI()
+-- Hàm save script
+local function saveScriptAsLua(scriptObj, filename)
+    if type(writefile) ~= "function" then return false end
+    
+    local success, source = pcall(function()
+        return scriptObj.Source
+    end)
+    
+    if success and source then
+        writefile(filename .. ".lua", source)
+        return true
+    end
+    
+    return false
+end
+
+-- Tạo các nút save
+local yPos = 10
+
+createSaveButton("💾 Save Selected Object", yPos, function()
+    if Explorer.SelectedObject then
+        local obj = Explorer.SelectedObject
+        
+        if obj:IsA("Model") then
+            local success = saveAsRBXM(obj, "SavedModel_" .. obj.Name)
+            if success then
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "✅ Model Saved",
+                    Text = "Saved as SavedModel_" .. obj.Name .. ".rbxm",
+                    Duration = 5
+                })
+            end
+        elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+            local success = saveScriptAsLua(obj, "SavedScript_" .. obj.Name)
+            if success then
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "✅ Script Saved",
+                    Text = "Saved as SavedScript_" .. obj.Name .. ".lua",
+                    Duration = 5
+                })
+            end
+        end
+    end
 end)
 
--- Nút Scan Game
-local scanBtn = createButton(scrollFrame, "🔍 Scan Game", 300)
-scanBtn.MouseButton1Click:Connect(function()
-    local parts = 0
-    local scripts = 0
-    local models = 0
+yPos = yPos + 50
+
+createSaveButton("🗺️ Save Map (Workspace)", yPos, function()
+    local mapData = {
+        Name = game.Name,
+        PlaceId = game.PlaceId,
+        Objects = {}
+    }
     
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            parts = parts + 1
-        elseif obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
-            scripts = scripts + 1
-        elseif obj:IsA("Model") then
-            models = models + 1
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            table.insert(mapData.Objects, {
+                Name = obj.Name,
+                Class = obj.ClassName
+            })
+        end
+    end
+    
+    if type(writefile) == "function" then
+        writefile("MapData_" .. game.PlaceId .. ".json", HttpService:JSONEncode(mapData))
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "✅ Map Saved",
+            Text = "Saved map data",
+            Duration = 5
+        })
+    end
+end)
+
+yPos = yPos + 50
+
+createSaveButton("📜 Save All Scripts", yPos, function()
+    if type(writefile) ~= "function" then return end
+    
+    local scriptCount = 0
+    local services = {Workspace, ReplicatedStorage, ServerScriptService, ServerStorage}
+    
+    for _, service in ipairs(services) do
+        for _, obj in ipairs(service:GetDescendants()) do
+            if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+                local success, source = pcall(function()
+                    return obj.Source
+                end)
+                
+                if success and source then
+                    scriptCount = scriptCount + 1
+                    local safeName = string.gsub(obj.Name, "[^%w_]", "_")
+                    writefile("Script_" .. safeName .. "_" .. scriptCount .. ".lua", source)
+                end
+            end
         end
     end
     
     game.StarterGui:SetCore("SendNotification", {
-        Title = "📊 Game Scan",
-        Text = "Parts: "..parts.."\nScripts: "..scripts.."\nModels: "..models,
-        Duration = 6
+        Title = "✅ Scripts Saved",
+        Text = "Saved " .. scriptCount .. " scripts",
+        Duration = 5
     })
 end)
 
--- ============== CONTROLS ==============
-menuIcon.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
+yPos = yPos + 50
+
+createSaveButton("🏗️ Save All Models", yPos, function()
+    if type(writefile) ~= "function" then return end
+    
+    local modelCount = 0
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            modelCount = modelCount + 1
+            saveAsRBXM(obj, "Model_" .. obj.Name .. "_" .. modelCount)
+        end
+    end
+    
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "✅ Models Saved",
+        Text = "Saved " .. modelCount .. " models",
+        Duration = 5
+    })
 end)
 
+saveContainer.CanvasSize = UDim2.new(0, 0, 0, yPos + 60)
+
+-- ============== INITIALIZE ==============
 closeBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
 end)
 
--- Auto-adjust scroll frame size
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+-- Load data khi tab được chọn
+for i, tabBtn in ipairs(tabButtons) do
+    tabBtn.MouseButton1Click:Connect(function()
+        if i == 2 then -- Scripts tab
+            loadScriptsTab()
+        elseif i == 3 then -- Models tab
+            loadModelsTab()
+        end
+    end)
+end
+
+-- Auto-load scripts tab
+spawn(function()
+    wait(2)
+    loadScriptsTab()
+    loadModelsTab()
 end)
 
--- Thông báo load thành công
-wait(1)
 game.StarterGui:SetCore("SendNotification", {
-    Title = "💾 Game Saver v2.0",
-    Text = "Loaded successfully! Click 💾 icon",
+    Title = "🎮 DEX++ Loaded",
+    Text = "Game Explorer ready!",
     Duration = 5
 })
 
-print("=== GAME SAVER v2.0 LOADED ===")
-print("File saving supported:", canSaveFiles())
-print("Ready to save scripts and game data!")
+print("=== DEX++ GAME EXPLORER LOADED ===")
+print("Features:")
+print("- 📁 Object Explorer (Dex Style)")
+print("- 📜 Script Viewer & Decompiler")
+print("- 🏗️ Model Viewer & Cloner")
+print("- 💾 Save to RBXM/LUA files")
